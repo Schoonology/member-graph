@@ -1,0 +1,119 @@
+<!DOCTYPE html>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, minimum-scale=.5, maximum-scale=2">
+<style>
+
+document, body {
+	margin: 0;
+	padding: 0;
+	overflow: hidden;
+}
+
+.node {
+	stroke: #fff;
+	stroke-width: 1.5px;
+}
+
+.link {
+	stroke: #999;
+	stroke-opacity: .6;
+
+	transition: stroke-width 300ms ease;
+}
+
+.link.highlighted {
+	stroke: darkred;
+	stroke-width: 2px;
+}
+
+</style>
+<body>
+<script src="//d3js.org/d3.v3.min.js"></script>
+<script>
+
+console.log(window.innerWidth, window.innerHeight);
+
+var nodeSize = 24;
+var width, height, smallest, nodeDistance;
+refreshSizes();
+
+var color = d3.scale.category20();
+
+var force = d3.layout.force()
+	.linkStrength(0.1);
+
+var svg = d3.select("body").append("svg")
+	.attr("width", width)
+	.attr("height", height);
+
+var request = new XMLHttpRequest();
+request.addEventListener('load', function(e) {
+	render(JSON.parse(request.responseText));
+});
+request.open('GET', 'merged.json');
+request.send();
+
+function refreshSizes() {
+	width = window.innerWidth;
+	height = window.innerHeight;
+	smallest = Math.min(width, height);
+	nodeDistance = Math.floor(smallest/6);
+}
+
+function resize() {
+	force.stop();
+	refreshSizes();
+
+    svg
+		.attr("width", width)
+		.attr("height", height);
+
+	force
+		.charge(-nodeDistance)
+		.linkDistance(nodeDistance)
+		.size([width, height])
+		.start();
+}
+
+function render(graph) {
+	force
+		.nodes(graph.nodes)
+		.links(graph.links);
+
+	window.addEventListener('resize', resize);
+	resize();
+
+	var link = svg.selectAll(".link").data(graph.links)
+		.enter().append("line")
+			.attr("class", "link");
+
+	var node = svg.selectAll(".node").data(graph.nodes)
+		.enter().append("image")
+			.attr('xlink:href', function(d) { return d.img; })
+			.attr("class", "node")
+			.attr("height", nodeSize)
+			.attr("width", nodeSize)
+			.on("mouseover", function(d) {
+				link.classed('highlighted', function(l) { return d === l.source || d === l.target; });
+			})
+			.on("mouseout", function() {
+				link.classed('highlighted', false);
+			})
+			.call(force.drag);
+
+	node.append("title")
+		.text(function(d) { return d.name; });
+
+	force.on("tick", function() {
+		var adjustment = Math.floor(nodeSize/2);
+		link.attr("x1", function(d) { return d.source.x; })
+			.attr("y1", function(d) { return d.source.y; })
+			.attr("x2", function(d) { return d.target.x; })
+			.attr("y2", function(d) { return d.target.y; });
+
+		node.attr("x", function(d) { return d.x - adjustment; })
+			.attr("y", function(d) { return d.y - adjustment; });
+	});
+};
+
+</script>
